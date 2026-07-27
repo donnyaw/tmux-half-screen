@@ -1,6 +1,6 @@
 # tmux-half-screen
 
-Regional column zoom for tmux — expand a stacked pane within its left or right column without affecting the opposite side. Press the binding again to restore the exact previous layout.
+Regional zoom for tmux: expand a pane within its left or right region without affecting the opposite side. It supports stacked panes and deeper nested splits. Press the binding again to restore the exact previous layout.
 
 Halfway between a 50/50 split and full-screen zoom (`prefix + z`).
 
@@ -41,6 +41,13 @@ set -g @plugin 'donnyaw/tmux-half-screen'
 ```
 
 Press `prefix + I` to install.
+
+The plugin binds `prefix + Z` automatically. To choose another key, set it before the plugin declaration:
+
+```tmux
+set -g @half-screen-key 'v'
+set -g @plugin 'donnyaw/tmux-half-screen'
+```
 
 ### Manual
 
@@ -108,9 +115,9 @@ tmux select-pane -t :.+
 tmux split-window -v        # right side now has top/bottom split
 ```
 
-### What qualifies as "stacked"
+### Supported region structures
 
-The script detects stacked panes by matching their `pane_left` and `pane_width` values. Two panes are considered stacked when they share the same horizontal position and width — meaning they are siblings in a vertical arrangement within the same column. This works whether the column is on the left or right side of the window.
+The script identifies the focused pane's top-level left or right region using the full-height pane on the opposite side. It then expands through nested vertical and horizontal splits while preserving that opposite pane.
 
 Example with three panes where the right column is split vertically:
 
@@ -120,7 +127,19 @@ Pane C (right-top):    pane_left=76  pane_width=74
 Pane D (right-bottom): pane_left=76  pane_width=74
 ```
 
-Panels C and D share `pane_left=76` and `pane_width=74`, so they are recognized as stacked. Focusing either one and pressing `prefix + Z` expands it within the right column.
+Panels C and D share `pane_left=76` and `pane_width=74`, so either can expand within the right region.
+
+Nested splits are supported too:
+
+```
+┌───────────────┬───────────────────────────────┐
+│               │ C                             │
+│ A             ├───────────────┬───────────────┤
+│               │ D             │ E (focused)   │
+└───────────────┴───────────────┴───────────────┘
+```
+
+Pressing `prefix + Z` in E expands E through both nested splits to nearly fill the entire right region. A remains unchanged.
 
 ## How it works
 
@@ -128,9 +147,9 @@ Panels C and D share `pane_left=76` and `pane_width=74`, so they are recognized 
 
 2. On first activation, the script saves the window's full layout string to a tmux window option (`@half_screen_saved_layout`) along with the current set of pane IDs (`@half_screen_saved_panes`).
 
-3. It identifies whether the focused pane has a stacked sibling by comparing `pane_left` and `pane_width` across all panes in the window.
+3. It finds the focused pane's top-level region from a full-height pane on the opposite side. If both sides are split, it falls back to detecting an exact stacked sibling.
 
-4. If a stacked sibling exists, it runs `tmux resize-pane -y 9999` to give the focused pane as much height as possible. tmux keeps one row for the sibling since a live pane cannot be hidden.
+4. It maximizes the focused pane vertically, then horizontally up to the region width. This expands through nested splits without changing the opposite top-level region. tmux keeps one row or column for each sibling because a live pane cannot be hidden.
 
 5. On the next activation, it restores the saved layout exactly — not a best-effort approximation.
 
@@ -142,8 +161,8 @@ If panes are added, removed, or moved between activations, the saved layout beco
 
 | Limitation | Explanation |
 |------------|-------------|
-| One-row sibling | tmux cannot resize a live pane to zero height. The sibling is retained as a single row or column. |
-| Requires stacked sibling | The script exits with a message if the focused pane has no vertical sibling in its column. |
+| Minimal siblings | tmux cannot resize a live pane to zero size. Nested siblings remain visible as one row or column. |
+| Region boundary required | The normal layout needs a full-height pane on the opposite side. If both sides are split, an exact stacked sibling is required as a fallback. |
 | Per-window state | Saved layouts are stored per tmux window, not per session. Different windows with the same binding work independently. |
 | 2-pane minimum | At least two panes must exist in the window. |
 
@@ -163,6 +182,7 @@ If panes are added, removed, or moved between activations, the saved layout beco
 - Verify the key is registered: `tmux list-keys -T prefix Z`
 - Ensure the script path is correct: `ls -la ~/.tmux/plugins/tmux-half-screen/half-screen-toggle.sh`
 - Reload tmux config: `tmux source-file ~/.tmux.conf`
+- If installed with TPM, verify `~/.tmux/plugins/tmux-half-screen/tmux-half-screen.tmux` exists and press `prefix + I` again.
 
 ### It triggers full-screen zoom instead
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Toggle a stacked pane between its full column height and its saved layout.
+# Toggle a pane between its full left/right region and its saved layout.
 set -euo pipefail
 
 pane_id=${1:?pane id is required}
@@ -22,29 +22,53 @@ if [[ -n $saved_layout ]]; then
 fi
 
 layout=$(tmux display-message -p -t "$pane_id" '#{window_layout}')
-read -r pane_left pane_width <<<"$(
-  tmux display-message -p -t "$pane_id" '#{pane_left} #{pane_width}'
+read -r pane_left pane_width window_width window_height <<<"$(
+  tmux display-message -p -t "$pane_id" '#{pane_left} #{pane_width} #{window_width} #{window_height}'
 )"
 
-# Only panes with the same horizontal bounds belong to the same column. This
-# preserves the window's left/right split while maximizing within that column.
-has_stacked_sibling=0
-while read -r other_id other_left other_width; do
-  if [[ $other_id != "$pane_id" && $other_left == "$pane_left" && $other_width == "$pane_width" ]]; then
-    has_stacked_sibling=1
-    break
-  fi
-done < <(tmux list-panes -t "$window_id" -F '#{pane_id} #{pane_left} #{pane_width}')
+# A full-height pane on the opposite side identifies the boundary of the
+# focused pane's top-level region. This also works when that region contains
+# additional nested horizontal and vertical splits.
+pane_right=$((pane_left + pane_width))
+region_left=$pane_left
+region_width=$pane_width
+found_region=0
 
-if (( ! has_stacked_sibling )); then
-  tmux display-message 'Regional zoom needs a pane above or below the active pane'
+while read -r other_id other_left other_width other_height; do
+  (( other_height == window_height )) || continue
+  other_right=$((other_left + other_width))
+
+  if (( other_right < pane_left )); then
+    region_left=$((other_right + 1))
+    region_width=$((window_width - region_left))
+    found_region=1
+  elif (( pane_right < other_left )); then
+    region_left=0
+    region_width=$((other_left - 1))
+    found_region=1
+  fi
+done < <(tmux list-panes -t "$window_id" -F '#{pane_id} #{pane_left} #{pane_width} #{pane_height}')
+
+# If both top-level regions are split, fall back to an exact stacked sibling.
+if (( ! found_region )); then
+  while read -r other_id other_left other_width; do
+    if [[ $other_id != "$pane_id" && $other_left == "$pane_left" && $other_width == "$pane_width" ]]; then
+      found_region=1
+      break
+    fi
+  done < <(tmux list-panes -t "$window_id" -F '#{pane_id} #{pane_left} #{pane_width}')
+fi
+
+if (( ! found_region )); then
+  tmux display-message 'Regional zoom needs another pane in the same left/right region'
   exit 0
 fi
 
-# tmux keeps one row for each sibling pane; the focused pane receives all
-# remaining height in its existing left or right column.
+# Maximize through nested splits while keeping the opposite top-level region at
+# its original width. tmux retains one row or column for each live sibling.
 tmux resize-pane -t "$pane_id" -y 9999
+tmux resize-pane -t "$pane_id" -x "$region_width"
 
 tmux set-window-option -t "$window_id" @half_screen_saved_layout "$layout"
 tmux set-window-option -t "$window_id" @half_screen_saved_panes "$current_panes"
-tmux display-message 'Pane maximized within its column; press prefix + M-z to restore'
+tmux display-message 'Pane maximized within its region; press prefix + Z to restore'
