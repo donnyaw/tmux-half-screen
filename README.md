@@ -107,9 +107,8 @@ Without unbinding, pressing `Alt+z` after the prefix may fire the full-screen zo
 ### Exiting the zoomed pane
 
 If you run `exit` in the pane that is currently region-zoomed, its original
-layout is restored automatically before tmux leaves the pane dead. Press Enter
-in that dead pane to remove it, or use `respawn-pane` if you want a new shell.
-Exiting another pane does not cancel the active regional zoom.
+layout is restored automatically and the exited pane is removed. Exiting
+another pane does not cancel the active regional zoom.
 
 Add this hook alongside the binding for manual installations:
 
@@ -182,7 +181,7 @@ If panes are added, removed, or moved between activations, the saved layout beco
 | Region boundary required | The normal layout needs a full-height pane on the opposite side. If both sides are split, an exact stacked sibling is required as a fallback. |
 | Per-window state | Saved layouts are stored per tmux window, not per session. Different windows with the same binding work independently. |
 | 2-pane minimum | At least two panes must exist in the window. |
-| Dead pane after `exit` | Auto-restore keeps the exited pane visible in its restored position. Press Enter to remove it or respawn it. |
+| Exited zoomed pane | Auto-restore removes the exited pane after restoring the layout. |
 
 ## Comparison with built-in tmux zoom
 

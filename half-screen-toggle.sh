@@ -20,6 +20,9 @@ if [[ -n $saved_layout ]]; then
     tmux set-window-option -u -t "$window_id" @half_screen_saved_pane_id
     tmux set-window-option -u -t "$window_id" remain-on-exit
     tmux display-message 'Half-screen layout restored'
+    if [[ $trigger == auto ]] && [[ $(tmux display-message -p -t "$pane_id" '#{pane_dead}') == 1 ]]; then
+      tmux kill-pane -t "$pane_id"
+    fi
     exit 0
   fi
 
