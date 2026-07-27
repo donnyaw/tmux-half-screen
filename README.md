@@ -42,7 +42,7 @@ set -g @plugin 'donnyaw/tmux-half-screen'
 
 Press `prefix + I` to install.
 
-The plugin binds `prefix + Z` automatically. To choose another key, set it before the plugin declaration:
+The plugin binds `prefix + Z` and activates automatic exit restoration. To choose another key, set it before the plugin declaration:
 
 ```tmux
 set -g @half-screen-key 'v'
