@@ -6,12 +6,18 @@ pane_id=${1:?pane id is required}
 window_id=$(tmux display-message -p -t "$pane_id" '#{window_id}')
 saved_layout=$(tmux show-window-options -v -t "$window_id" @half_screen_saved_layout 2>/dev/null || true)
 saved_panes=$(tmux show-window-options -v -t "$window_id" @half_screen_saved_panes 2>/dev/null || true)
+saved_pane_id=$(tmux show-window-options -v -t "$window_id" @half_screen_saved_pane_id 2>/dev/null || true)
 current_panes=$(tmux list-panes -t "$window_id" -F '#{pane_id}' | LC_ALL=C sort | paste -sd, -)
 
 if [[ -n $saved_layout ]]; then
-  if [[ -n $saved_panes && $saved_panes == "$current_panes" ]] && tmux select-layout -t "$window_id" "$saved_layout"; then
+  if [[ -n $saved_pane_id && $pane_id != "$saved_pane_id" ]]; then
+    # A pane exited that is not the zoomed pane — do not auto-restore.
+    exit 0
+  elif [[ -n $saved_panes && $saved_panes == "$current_panes" ]] && tmux select-layout -t "$window_id" "$saved_layout"; then
     tmux set-window-option -u -t "$window_id" @half_screen_saved_layout
     tmux set-window-option -u -t "$window_id" @half_screen_saved_panes
+    tmux set-window-option -u -t "$window_id" @half_screen_saved_pane_id
+    tmux set-window-option -u -t "$window_id" remain-on-exit
     tmux display-message 'Half-screen layout restored'
     exit 0
   fi
@@ -19,6 +25,8 @@ if [[ -n $saved_layout ]]; then
   # Pane creation, removal, or movement invalidates tmux's saved layout string.
   tmux set-window-option -u -t "$window_id" @half_screen_saved_layout
   tmux set-window-option -u -t "$window_id" @half_screen_saved_panes 2>/dev/null || true
+  tmux set-window-option -u -t "$window_id" @half_screen_saved_pane_id 2>/dev/null || true
+  tmux set-window-option -u -t "$window_id" remain-on-exit 2>/dev/null || true
 fi
 
 layout=$(tmux display-message -p -t "$pane_id" '#{window_layout}')
@@ -69,6 +77,10 @@ fi
 tmux resize-pane -t "$pane_id" -y 9999
 tmux resize-pane -t "$pane_id" -x "$region_width"
 
+# Keep pane after process exit so pane-died hook can restore the layout.
+tmux set-window-option -t "$window_id" remain-on-exit on
+
 tmux set-window-option -t "$window_id" @half_screen_saved_layout "$layout"
 tmux set-window-option -t "$window_id" @half_screen_saved_panes "$current_panes"
+tmux set-window-option -t "$window_id" @half_screen_saved_pane_id "$pane_id"
 tmux display-message 'Pane maximized within its region; press prefix + Z to restore'
