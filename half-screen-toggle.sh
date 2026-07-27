@@ -3,6 +3,7 @@
 set -euo pipefail
 
 pane_id=${1:?pane id is required}
+trigger=${2:-manual}
 window_id=$(tmux display-message -p -t "$pane_id" '#{window_id}')
 saved_layout=$(tmux show-window-options -v -t "$window_id" @half_screen_saved_layout 2>/dev/null || true)
 saved_panes=$(tmux show-window-options -v -t "$window_id" @half_screen_saved_panes 2>/dev/null || true)
@@ -10,7 +11,7 @@ saved_pane_id=$(tmux show-window-options -v -t "$window_id" @half_screen_saved_p
 current_panes=$(tmux list-panes -t "$window_id" -F '#{pane_id}' | LC_ALL=C sort | paste -sd, -)
 
 if [[ -n $saved_layout ]]; then
-  if [[ -n $saved_pane_id && $pane_id != "$saved_pane_id" ]]; then
+  if [[ $trigger == auto && -n $saved_pane_id && $pane_id != "$saved_pane_id" ]]; then
     # A pane exited that is not the zoomed pane — do not auto-restore.
     exit 0
   elif [[ -n $saved_panes && $saved_panes == "$current_panes" ]] && tmux select-layout -t "$window_id" "$saved_layout"; then

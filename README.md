@@ -104,6 +104,19 @@ Without unbinding, pressing `Alt+z` after the prefix may fire the full-screen zo
 4. The pane fills its column. The opposite side stays untouched.
 5. Press the binding again to restore the exact layout.
 
+### Exiting the zoomed pane
+
+If you run `exit` in the pane that is currently region-zoomed, its original
+layout is restored automatically before tmux leaves the pane dead. Press Enter
+in that dead pane to remove it, or use `respawn-pane` if you want a new shell.
+Exiting another pane does not cancel the active regional zoom.
+
+Add this hook alongside the binding for manual installations:
+
+```tmux
+set-hook -g pane-died "run-shell '~/.tmux/plugins/tmux-half-screen/half-screen-toggle.sh #{pane_id} auto'"
+```
+
 ### How to create the target layout
 
 ```
@@ -151,7 +164,11 @@ Pressing `prefix + Z` in E expands E through both nested splits to nearly fill t
 
 4. It maximizes the focused pane vertically, then horizontally up to the region width. This expands through nested splits without changing the opposite top-level region. tmux keeps one row or column for each sibling because a live pane cannot be hidden.
 
-5. On the next activation, it restores the saved layout exactly — not a best-effort approximation.
+5. When the zoomed process exits, `remain-on-exit` keeps its pane alive long
+enough for the `pane-died` hook to restore the layout. The temporary option and
+saved state are then cleared.
+
+6. On the next manual activation, it restores the saved layout exactly — not a best-effort approximation.
 
 ### State invalidation
 
@@ -165,6 +182,7 @@ If panes are added, removed, or moved between activations, the saved layout beco
 | Region boundary required | The normal layout needs a full-height pane on the opposite side. If both sides are split, an exact stacked sibling is required as a fallback. |
 | Per-window state | Saved layouts are stored per tmux window, not per session. Different windows with the same binding work independently. |
 | 2-pane minimum | At least two panes must exist in the window. |
+| Dead pane after `exit` | Auto-restore keeps the exited pane visible in its restored position. Press Enter to remove it or respawn it. |
 
 ## Comparison with built-in tmux zoom
 
